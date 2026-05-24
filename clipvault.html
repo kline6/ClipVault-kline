@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipVault - 剪切板管理器</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { mono: ['JetBrains Mono', 'monospace'] },
+                    colors: {
+                        surface: { 1: '#0a0a0f', 2: '#0f0f18', 3: '#141420', 4: '#1a1a2e', 5: '#22223a' },
+                        accent: { DEFAULT: '#22d3ee', soft: '#0e7490', glow: '#22d3ee22', dim: '#164e63' },
+                        warn: '#fbbf24',
+                        danger: '#f87171',
+                        muted: '#64748b'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #0a0a0f;
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        .glass {
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.04);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+        }
+        .glass-strong {
+            background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .glass-card {
+            background: linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 2px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            background: linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%);
+            border-color: rgba(34,211,238,0.2);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 20px rgba(34,211,238,0.06), inset 0 1px 0 rgba(255,255,255,0.06);
+            transform: translateY(-2px);
+        }
+        .glass-card.pinned-card {
+            border-color: rgba(251,191,36,0.25);
+            box-shadow: 0 2px 16px rgba(0,0,0,0.2), 0 0 12px rgba(251,191,36,0.05), inset 0 1px 0 rgba(251,191,36,0.08);
+        }
+        .glass-card.pinned-card:hover {
+            border-color: rgba(251,191,36,0.4);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 20px rgba(251,191,36,0.08), inset 0 1px 0 rgba(251,191,36,0.1);
+        }
+
+        .glass-input {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            transition: all 0.3s;
+            outline: none;
+        }
+        .glass-input:focus {
+            border-color: rgba(34,211,238,0.4);
+            box-shadow: 0 0 0 3px rgba(34,211,238,0.08), 0 0 20px rgba(34,211,238,0.06);
+            background: rgba(255,255,255,0.04);
+        }
+        .glass-input::placeholder { color: #475569; }
+
+        .glass-tag {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.25s;
+            white-space: nowrap;
+        }
+        .glass-tag:hover {
+            background: rgba(255,255,255,0.06);
+            color: #e2e8f0;
+            border-color: rgba(255,255,255,0.1);
+        }
+        .glass-tag.active {
+            background: rgba(34,211,238,0.1);
+            border-color: rgba(34,211,238,0.35);
+            color: #22d3ee;
+            box-shadow: 0 0 12px rgba(34,211,238,0.08);
+        }
+
+        .icon-btn {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .icon-btn:hover {
+            background: rgba(255,255,255,0.06);
+            color: #e2e8f0;
+            border-color: rgba(255,255,255,0.1);
+        }
+        .icon-btn.danger:hover {
+            background: rgba(248,113,113,0.1);
+            color: #f87171;
+            border-color: rgba(248,113,113,0.3);
+        }
+        .icon-btn.pin-active {
+            color: #fbbf24;
+            background: rgba(251,191,36,0.08);
+            border-color: rgba(251,191,36,0.25);
+        }
+        .icon-btn.copy-flash {
+            background: rgba(34,211,238,0.15) !important;
+            border-color: rgba(34,211,238,0.4) !important;
+            color: #22d3ee !important;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(16px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(24px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34,211,238,0.2); }
+            50% { box-shadow: 0 0 0 8px rgba(34,211,238,0); }
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(16px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(8px) scale(0.95); }
+        }
+
+        .animate-in { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .animate-slide-down { animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .animate-slide-up { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .animate-scale { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .animate-pulse-glow { animation: pulseGlow 1.5s ease-in-out; }
+        .toast-enter { animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .toast-exit { animation: toastOut 0.25s ease-in both; }
+
+        .bg-grid {
+            background-image:
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+        .bg-glow {
+            position: fixed;
+            width: 600px; height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.08;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .kbd {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1px 5px;
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 4px;
+            color: #475569;
+            line-height: 1.4;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #334155;
+        }
+        .empty-state svg {
+            width: 48px; height: 48px;
+            margin: 0 auto 16px;
+            opacity: 0.4;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+        // ===== Icon Components =====
+        const Icon = ({ name, size = 16, className = '' }) => {
+            const ref = useRef(null);
+            useEffect(() => {
+                if (ref.current && lucide.icons[name]) {
+                    ref.current.innerHTML = '';
+                    const svg = lucide.createElement(lucide.icons[name]);
+                    svg.setAttribute('width', size);
+                    svg.setAttribute('height', size);
+                    ref.current.appendChild(svg);
+                }
+            }, [name, size]);
+            return <span ref={ref} className={className} style={{ display: 'inline-flex', alignItems: 'center' }} />;
+        };
+
+        // ===== Toast System =====
+        const Toast = ({ message, visible, type = 'success' }) => {
+            if (!visible) return null;
+            const bg = type === 'error' ? 'rgba(248,113,113,0.12)' : 'rgba(34,211,238,0.12)';
+            const border = type === 'error' ? 'rgba(248,113,113,0.3)' : 'rgba(34,211,238,0.3)';
+            const color = type === 'error' ? '#f87171' : '#22d3ee';
+            return (
+                <div style={{
+                    position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 9999, padding: '10px 20px', borderRadius: 12,
+                    background: bg, border: `1px solid ${border}`, color,
+                    fontSize: 12, fontWeight: 500, backdropFilter: 'blur(20px)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                    animation: 'toastIn 0.3s cubic-bezier(0.16,1,0.3,1) both'
+                }}>
+                    {type === 'success' && <Icon name="check" size={14} className="mr-1.5" />}
+                    {type === 'error' && <Icon name="x" size={14} className="mr-1.5" />}
+                    {message}
+                </div>
+            );
+        };
+
+        // ===== Clip Card =====
+        const ClipCard = ({ clip, index, onCopy, onPin, onDelete, onEdit, onAddTag, onRemoveTag }) => {
+            const [showMenu, setShowMenu] = useState(false);
+            const [editing, setEditing] = useState(false);
+            const [editText, setEditText] = useState(clip.text);
+            const [showTagInput, setShowTagInput] = useState(false);
+            const [tagInput, setTagInput] = useState('');
+            const [copyFlash, setCopyFlash] = useState(false);
+            const menuRef = useRef(null);
+            const tagInputRef = useRef(null);
+
+            useEffect(() => {
+                const handleClick = (e) => {
+                    if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
+                };
+                document.addEventListener('mousedown', handleClick);
+                return () => document.removeEventListener('mousedown', handleClick);
+            }, []);
+
+            useEffect(() => {
+                if (showTagInput && tagInputRef.current) tagInputRef.current.focus();
+            }, [showTagInput]);
+
+            const handleCopy = () => {
+                onCopy(clip.id);
+                setCopyFlash(true);
+                setTimeout(() => setCopyFlash(false), 600);
+            };
+
+            const handleSaveEdit = () => {
+                if (editText.trim() && editText !== clip.text) onEdit(clip.id, editText.trim());
+                setEditing(false);
+            };
+
+            const handleAddTag = () => {
+                const tag = tagInput.trim().toLowerCase();
+                if (tag && !clip.tags.includes(tag)) {
+                    onAddTag(clip.id, tag);
+                    setTagInput('');
+                    setShowTagInput(false);
+                }
+            };
+
+            const timeAgo = (ts) => {
+                const diff = Date.now() - ts;
+                const s = Math.floor(diff / 1000);
+                if (s < 60) return '刚刚';
+                const m = Math.floor(s / 60);
+                if (m < 60) return `${m}分钟前`;
+                const h = Math.floor(m / 60);
+                if (h < 24) return `${h}小时前`;
+                const d = Math.floor(h / 24);
+                if (d < 7) return `${d}天前`;
+                return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+            };
+
+            return (
+                <div
+                    className={`glass-card rounded-2xl p-5 animate-in relative group ${clip.pinned ? 'pinned-card' : ''}`}
+                    style={{ animationDelay: `${Math.min(index * 50, 400)}ms` }}
+                >
+                    {/* Top bar */}
+                    <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            {clip.pinned && <Icon name="pin" size={13} className="text-yellow-400" />}
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
+                                {timeAgo(clip.timestamp)}
+                            </span>
+                            {clip.copyCount > 0 && (
+                                <span className="text-[10px] font-medium text-slate-600 flex items-center gap-1">
+                                    <Icon name="copy" size={10} /> {clip.copyCount}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <button
+                                className={`icon-btn ${copyFlash ? 'copy-flash animate-pulse-glow' : ''}`}
+                                onClick={handleCopy}
+                                title="复制"
+                            >
+                                <Icon name={copyFlash ? 'check' : 'copy'} size={13} />
+                            </button>
+                            <button
+                                className={`icon-btn ${clip.pinned ? 'pin-active' : ''}`}
+                                onClick={() => onPin(clip.id)}
+                                title={clip.pinned ? '取消置顶' : '置顶'}
+                            >
+                                <Icon name="pin" size={13} />
+                            </button>
+                            <button
+                                className="icon-btn danger"
+                                onClick={() => onDelete(clip.id)}
+                                title="删除"
+                            >
+                                <Icon name="trash-2" size={13} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    {editing ? (
+                        <div className="mb-3">
+                            <textarea
+                                className="glass-input w-full p-3 resize-none"
+                                rows={3}
+                                value={editText}
+                                onChange={(e) => setEditText(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSaveEdit();
+                                    if (e.key === 'Escape') setEditing(false);
+                                }}
+                            />
+                            <div className="flex gap-2 mt-2">
+                                <button
+                                    className="px-3 py-1 text-[11px] font-medium rounded-lg bg-accent/15 text-cyan-400 border border-accent/30 hover:bg-accent/25 transition-all"
+                                    onClick={handleSaveEdit}
+                                >
+                                    保存
+                                </button>
+                                <button
+                                    className="px-3 py-1 text-[11px] font-medium rounded-lg text-slate-500 hover:text-slate-300 transition-all"
+                                    onClick={() => setEditing(false)}
+                                >
+                                    取消
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p
+                            className="text-[13px] leading-relaxed text-slate-300 mb-3 cursor-pointer hover:text-slate-200 transition-colors line-clamp-4"
+                            style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}
+                            onClick={handleCopy}
+                            title="点击复制"
+                        >
+                            {clip.text}
+                        </p>
+                    )}
+
+                    {/* Tags */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {clip.tags.map(tag => (
+                            <span
+                                key={tag}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-white/[0.04] text-slate-500 border border-white/[0.06] hover:border-red-400/30 hover:text-red-400 cursor-pointer transition-all group/tag"
+                                onClick={() => onRemoveTag(clip.id, tag)}
+                                title="点击移除标签"
+                            >
+                                <span className="group-hover/tag:hidden"># {tag}</span>
+                                <span className="hidden group-hover/tag:flex items-center gap-0.5">
+                                    <Icon name="x" size={8} /> {tag}
+                                </span>
+                            </span>
+                        ))}
+                        {showTagInput ? (
+                            <input
+                                ref={tagInputRef}
+                                className="glass-input px-2 py-0.5 text-[10px] w-20"
+                                value={tagInput}
+                                onChange={(e) => setTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleAddTag();
+                                    if (e.key === 'Escape') { setShowTagInput(false); setTagInput(''); }
+                                }}
+                                onBlur={() => { if (!tagInput.trim()) setShowTagInput(false); }}
+                                placeholder="标签名"
+                            />
+                        ) : (
+                            <button
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-slate-600 hover:text-slate-400 hover:bg-white/[0.03] transition-all cursor-pointer"
+                                onClick={() => setShowTagInput(true)}
+                            >
+                                <Icon name="plus" size={10} /> 标签
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // ===== Main App =====
+        const App = () => {
+            const [clips, setClips] = useState([]);
+            const [search, setSearch] = useState('');
+            const [activeFilter, setActiveFilter] = useState('all');
+            const [newText, setNewText] = useState('');
+            const [showInput, setShowInput] = useState(false);
+            const [showToast, setShowToast] = useState(false);
+            const [toastMsg, setToastMsg] = useState('');
+            const [toastType, setToastType] = useState('success');
+            const inputRef = useRef(null);
+            const searchRef = useRef(null);
+
+            // Load from localStorage
+            useEffect(() => {
+                try {
+                    const saved = localStorage.getItem('clipvault_data');
+                    if (saved) setClips(JSON.parse(saved));
+                } catch {}
+            }, []);
+
+            // Save to localStorage
+            useEffect(() => {
+                try { localStorage.setItem('clipvault_data', JSON.stringify(clips)); } catch {}
+            }, [clips]);
+
+            // Keyboard shortcuts
+            useEffect(() => {
+                const handler = (e) => {
+                    if (e.key === '/' && !e.metaKey && !e.ctrlKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                        e.preventDefault();
+                        searchRef.current?.focus();
+                    }
+                    if (e.key === 'n' && !e.metaKey && !e.ctrlKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                        e.preventDefault();
+                        setShowInput(true);
+                        setTimeout(() => inputRef.current?.focus(), 50);
+                    }
+                    if (e.key === 'Escape') {
+                        setShowInput(false);
+                        setSearch('');
+                        searchRef.current?.blur();
+                    }
+                };
+                window.addEventListener('keydown', handler);
+                return () => window.removeEventListener('keydown', handler);
+            }, []);
+
+            useEffect(() => {
+                if (showInput && inputRef.current) inputRef.current.focus();
+            }, [showInput]);
+
+            const toast = (msg, type = 'success') => {
+                setToastMsg(msg);
+                setToastType(type);
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 2000);
+            };
+
+            const addClip = () => {
+                const text = newText.trim();
+                if (!text) return;
+                const clip = {
+                    id: Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+                    text,
+                    timestamp: Date.now(),
+                    pinned: false,
+                    tags: [],
+                    copyCount: 0
+                };
+                setClips(prev => [clip, ...prev]);
+                setNewText('');
+                setShowInput(false);
+                toast('已添加到剪切板');
+            };
+
+            const copyClip = async (id) => {
+                const clip = clips.find(c => c.id === id);
+                if (!clip) return;
+                try {
+                    await navigator.clipboard.writeText(clip.text);
+                    setClips(prev => prev.map(c => c.id === id ? { ...c, copyCount: c.copyCount + 1 } : c));
+                    toast('已复制到剪切板');
+                } catch {
+                    // Fallback for non-HTTPS
+                    const textarea = document.createElement('textarea');
+                    textarea.value = clip.text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    setClips(prev => prev.map(c => c.id === id ? { ...c, copyCount: c.copyCount + 1 } : c));
+                    toast('已复制到剪切板');
+                }
+            };
+
+            const pinClip = (id) => {
+                setClips(prev => prev.map(c => c.id === id ? { ...c, pinned: !c.pinned } : c));
+            };
+
+            const deleteClip = (id) => {
+                setClips(prev => prev.filter(c => c.id !== id));
+                toast('已删除', 'error');
+            };
+
+            const editClip = (id, text) => {
+                setClips(prev => prev.map(c => c.id === id ? { ...c, text } : c));
+                toast('已更新');
+            };
+
+            const addTag = (id, tag) => {
+                setClips(prev => prev.map(c => c.id === id ? { ...c, tags: [...c.tags, tag] } : c));
+            };
+
+            const removeTag = (id, tag) => {
+                setClips(prev => prev.map(c => c.id === id ? { ...c, tags: c.tags.filter(t => t !== tag) } : c));
+            };
+
+            const clearAll = () => {
+                if (clips.length === 0) return;
+                setClips([]);
+                toast('已清空所有记录', 'error');
+            };
+
+            const exportData = () => {
+                const blob = new Blob([JSON.stringify(clips, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `clipvault_export_${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                toast('已导出数据');
+            };
+
+            const importData = (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const data = JSON.parse(evt.target.result);
+                        if (Array.isArray(data)) {
+                            setClips(prev => [...data, ...prev]);
+                            toast(`已导入 ${data.length} 条记录`);
+                        }
+                    } catch { toast('导入失败：文件格式错误', 'error'); }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+            };
+
+            // Get all unique tags
+            const allTags = useMemo(() => {
+                const tags = new Set();
+                clips.forEach(c => c.tags.forEach(t => tags.add(t)));
+                return Array.from(tags).sort();
+            }, [clips]);
+
+            // Filter & sort clips
+            const filteredClips = useMemo(() => {
+                let result = [...clips];
+
+                // Filter by tab
+                if (activeFilter === 'pinned') result = result.filter(c => c.pinned);
+                else if (activeFilter.startsWith('tag:')) {
+                    const tag = activeFilter.slice(4);
+                    result = result.filter(c => c.tags.includes(tag));
+                }
+
+                // Filter by search
+                if (search.trim()) {
+                    const q = search.toLowerCase();
+                    result = result.filter(c =>
+                        c.text.toLowerCase().includes(q) ||
+                        c.tags.some(t => t.includes(q))
+                    );
+                }
+
+                // Sort: pinned first, then by timestamp
+                result.sort((a, b) => {
+                    if (a.pinned && !b.pinned) return -1;
+                    if (!a.pinned && b.pinned) return 1;
+                    return b.timestamp - a.timestamp;
+                });
+
+                return result;
+            }, [clips, activeFilter, search]);
+
+            const pinnedCount = clips.filter(c => c.pinned).length;
+
+            return (
+                <div className="h-screen flex flex-col relative bg-grid overflow-hidden">
+                    {/* Background glows */}
+                    <div className="bg-glow" style={{ background: '#22d3ee', top: '-200px', left: '-100px' }} />
+                    <div className="bg-glow" style={{ background: '#818cf8', bottom: '-200px', right: '-100px' }} />
+
+                    {/* Header */}
+                    <header className="glass-strong relative z-20 animate-slide-down" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div className="max-w-7xl mx-auto px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                {/* Logo */}
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 border border-cyan-500/20 flex items-center justify-center">
+                                        <Icon name="clipboard" size={18} className="text-cyan-400" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-[15px] font-semibold text-white tracking-tight">ClipVault</h1>
+                                        <p className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">
+                                            {clips.length} 条记录
+                                            {pinnedCount > 0 && <span className="text-yellow-500/60 ml-2">{pinnedCount} 置顶</span>}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Search */}
+                                <div className="relative w-80">
+                                    <Icon name="search" size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                                    <input
+                                        ref={searchRef}
+                                        type="text"
+                                        className="glass-input w-full pl-10 pr-16 py-2.5"
+                                        placeholder="搜索记录..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                                        <kbd className="kbd">/</kbd>
+                                    </span>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        className="icon-btn"
+                                        onClick={exportData}
+                                        title="导出数据"
+                                    >
+                                        <Icon name="download" size={14} />
+                                    </button>
+                                    <label className="icon-btn cursor-pointer" title="导入数据">
+                                        <Icon name="upload" size={14} />
+                                        <input type="file" accept=".json" className="hidden" onChange={importData} />
+                                    </label>
+                                    {clips.length > 0 && (
+                                        <button
+                                            className="icon-btn danger"
+                                            onClick={clearAll}
+                                            title="清空所有"
+                                        >
+                                            <Icon name="trash-2" size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Filter Tags */}
+                    <div className="relative z-10 animate-slide-down" style={{ animationDelay: '80ms' }}>
+                        <div className="max-w-7xl mx-auto px-6 py-3.5">
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                                <button
+                                    className={`glass-tag ${activeFilter === 'all' ? 'active' : ''}`}
+                                    onClick={() => setActiveFilter('all')}
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        <Icon name="layout-grid" size={12} />
+                                        全部
+                                    </span>
+                                </button>
+                                <button
+                                    className={`glass-tag ${activeFilter === 'pinned' ? 'active' : ''}`}
+                                    onClick={() => setActiveFilter('pinned')}
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        <Icon name="pin" size={12} />
+                                        置顶
+                                        {pinnedCount > 0 && (
+                                            <span className="ml-0.5 px-1.5 py-0 text-[9px] rounded-md bg-yellow-400/15 text-yellow-400">
+                                                {pinnedCount}
+                                            </span>
+                                        )}
+                                    </span>
+                                </button>
+                                {allTags.length > 0 && (
+                                    <div className="w-px h-4 bg-white/[0.06] mx-1 flex-shrink-0" />
+                                )}
+                                {allTags.map(tag => (
+                                    <button
+                                        key={tag}
+                                        className={`glass-tag ${activeFilter === `tag:${tag}` ? 'active' : ''}`}
+                                        onClick={() => setActiveFilter(activeFilter === `tag:${tag}` ? 'all' : `tag:${tag}`)}
+                                    >
+                                        # {tag}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <main className="flex-1 overflow-y-auto relative z-10">
+                        <div className="max-w-7xl mx-auto px-6 py-2 pb-28">
+                            {filteredClips.length === 0 ? (
+                                <div className="empty-state animate-scale">
+                                    {clips.length === 0 ? (
+                                        <>
+                                            <Icon name="clipboard" size={48} />
+                                            <p className="text-[13px] font-medium text-slate-600 mb-1">暂无记录</p>
+                                            <p className="text-[11px] text-slate-700 mb-4">
+                                                按 <kbd className="kbd">N</kbd> 添加第一条记录
+                                            </p>
+                                            <button
+                                                className="glass-tag active"
+                                                onClick={() => { setShowInput(true); setTimeout(() => inputRef.current?.focus(), 50); }}
+                                            >
+                                                <span className="flex items-center gap-1.5">
+                                                    <Icon name="plus" size={12} />
+                                                    添加记录
+                                                </span>
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Icon name="search" size={48} />
+                                            <p className="text-[13px] font-medium text-slate-600 mb-1">未找到匹配项</p>
+                                            <p className="text-[11px] text-slate-700">试试其他关键词或清除筛选</p>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
+                                    {filteredClips.map((clip, i) => (
+                                        <ClipCard
+                                            key={clip.id}
+                                            clip={clip}
+                                            index={i}
+                                            onCopy={copyClip}
+                                            onPin={pinClip}
+                                            onDelete={deleteClip}
+                                            onEdit={editClip}
+                                            onAddTag={addTag}
+                                            onRemoveTag={removeTag}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </main>
+
+                    {/* Floating Add Bar */}
+                    {showInput && (
+                        <div className="fixed bottom-0 left-0 right-0 z-30 animate-slide-up">
+                            <div className="max-w-3xl mx-auto px-6 pb-6">
+                                <div className="glass-strong rounded-2xl p-4">
+                                    <textarea
+                                        ref={inputRef}
+                                        className="glass-input w-full p-3 resize-none mb-3"
+                                        rows={3}
+                                        placeholder="粘贴或输入内容..."
+                                        value={newText}
+                                        onChange={(e) => setNewText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addClip();
+                                            if (e.key === 'Escape') { setShowInput(false); setNewText(''); }
+                                        }}
+                                    />
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <kbd className="kbd">⌘</kbd>
+                                            <kbd className="kbd">Enter</kbd>
+                                            <span className="text-[10px] text-slate-600 ml-1">保存</span>
+                                            <kbd className="kbd ml-3">Esc</kbd>
+                                            <span className="text-[10px] text-slate-600 ml-1">取消</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                className="px-4 py-2 text-[11px] font-medium rounded-xl text-slate-500 hover:text-slate-300 transition-all"
+                                                onClick={() => { setShowInput(false); setNewText(''); }}
+                                            >
+                                                取消
+                                            </button>
+                                            <button
+                                                className="px-5 py-2 text-[11px] font-semibold rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white hover:from-cyan-400 hover:to-cyan-500 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                disabled={!newText.trim()}
+                                                onClick={addClip}
+                                            >
+                                                保存记录
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* FAB */}
+                    {!showInput && (
+                        <button
+                            className="fixed bottom-8 right-8 z-30 w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-xl shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center animate-slide-up"
+                            style={{ animationDelay: '300ms' }}
+                            onClick={() => { setShowInput(true); setTimeout(() => inputRef.current?.focus(), 50); }}
+                            title="添加记录 (N)"
+                        >
+                            <Icon name="plus" size={24} />
+                        </button>
+                    )}
+
+                    {/* Keyboard shortcuts hint */}
+                    {!showInput && (
+                        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 animate-slide-up" style={{ animationDelay: '500ms' }}>
+                            <span className="text-[10px] text-slate-700 flex items-center gap-1.5">
+                                <kbd className="kbd">/</kbd> 搜索
+                            </span>
+                            <span className="text-[10px] text-slate-700 flex items-center gap-1.5">
+                                <kbd className="kbd">N</kbd> 新建
+                            </span>
+                            <span className="text-[10px] text-slate-700 flex items-center gap-1.5">
+                                <kbd className="kbd">Esc</kbd> 关闭
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Toast */}
+                    <Toast message={toastMsg} visible={showToast} type={toastType} />
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

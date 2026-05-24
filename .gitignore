@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.db
+*.db-journal
+clipvault-images/
+settings.json
+.env
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,56 @@
+{
+  "name": "clipvault",
+  "version": "1.0.0",
+  "description": "ClipVault - Smart Clipboard Manager",
+  "type": "module",
+  "main": "main/index.js",
+  "author": "kline",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "npx vitest run",
+    "test:watch": "npx vitest",
+    "test:db": "npx vitest run tests/db.test.js",
+    "test:watcher": "npx vitest run tests/clipboard-watcher.test.js",
+    "test:ipc": "npx vitest run tests/ipc-handlers.test.js",
+    "test:ui": "npx vitest run tests/ui-logic.test.js",
+    "build": "node build.mjs",
+    "pack": "npx @electron/packager . ClipVault --platform=win32 --arch=x64 --out=dist --overwrite --no-prune"
+  },
+  "dependencies": {
+    "sql.js": "^1.11.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "vitest": "^2.0.0"
+  },
+  "build": {
+    "appId": "com.clipvault.app",
+    "productName": "ClipVault",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "node_modules/**/*",
+      "!node_modules/**/test/**",
+      "!node_modules/**/tests/**",
+      "!node_modules/**/*.md",
+      "!tests/**",
+      "!PLAN.md",
+      "!clipvault.html",
+      "!clipvault.test.js",
+      "!vitest.config.js",
+      "!build.mjs",
+      "!*.bat"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "ClipVault.exe"
+    }
+  }
+}

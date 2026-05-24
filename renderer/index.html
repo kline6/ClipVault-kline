@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipVault</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+    // ===== 星河粒子系统 + 鼠标轨迹 =====
+    class GalaxyParticles {
+        constructor(canvas) {
+            this.canvas = canvas;
+            this.ctx = canvas.getContext('2d');
+            this.stars = [];
+            this.trailParticles = [];
+            this.mouseX = -200;
+            this.mouseY = -200;
+            this.mouseActive = false;
+            this.time = 0;
+
+            // 粉色星河调色板 (适配浅色背景)
+            this.galaxyColors = [
+                [200,60,110],   // 玫瑰红
+                [232,93,138],   // 粉红
+                [176,96,176],   // 兰花紫
+                [180,70,120],   // 深粉
+                [210,100,140],  // 暖粉
+                [160,80,160],   // 紫粉
+                [140,60,100],   // 浆果
+                [100,50,80],    // 深浆果
+            ];
+
+            this.resize();
+            this.initStars();
+            this.bindMouse();
+            this.animate();
+            window.addEventListener('resize', () => this.resize());
+        }
+
+        resize() {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
+
+        initStars() {
+            // 星河粒子 (80颗)
+            for (let i = 0; i < 80; i++) {
+                this.stars.push(this.createStar());
+            }
+        }
+
+        createStar() {
+            const c = this.galaxyColors[Math.floor(Math.random() * this.galaxyColors.length)];
+            return {
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                size: Math.random() * 2.5 + 0.5,
+                speedX: (Math.random() - 0.5) * 0.15,
+                speedY: (Math.random() - 0.5) * 0.1,
+                r: c[0], g: c[1], b: c[2],
+                opacity: Math.random() * 0.4 + 0.1,
+                twinkle: Math.random() * Math.PI * 2,
+                twinkleSpeed: Math.random() * 0.03 + 0.01,
+                // 漂流方向 (模拟星河流淌)
+                drift: Math.random() * 0.3 + 0.1,
+                driftAngle: Math.random() * Math.PI * 2,
+            };
+        }
+
+        bindMouse() {
+            document.addEventListener('mousemove', (e) => {
+                this.mouseX = e.clientX;
+                this.mouseY = e.clientY;
+                this.mouseActive = true;
+                for (let i = 0; i < 3; i++) {
+                    this.trailParticles.push(this.createTrail(e.clientX, e.clientY));
+                }
+            });
+            document.addEventListener('mouseleave', () => { this.mouseActive = false; });
+        }
+
+        createTrail(x, y) {
+            const c = this.galaxyColors[Math.floor(Math.random() * 4)];
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 2 + 0.8;
+            return {
+                x: x + (Math.random() - 0.5) * 10,
+                y: y + (Math.random() - 0.5) * 10,
+                size: Math.random() * 3.5 + 1.5,
+                speedX: Math.cos(angle) * speed,
+                speedY: Math.sin(angle) * speed - 0.3,
+                r: c[0], g: c[1], b: c[2],
+                life: 1,
+                decay: 0.012 + Math.random() * 0.008,
+            };
+        }
+
+        animate() {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.time += 0.01;
+
+            // 星河流动效果 (整体缓慢漂移)
+            const flowX = Math.sin(this.time * 0.5) * 0.3;
+            const flowY = Math.cos(this.time * 0.3) * 0.2;
+
+            // 绘制星点 + 连线
+            for (let i = 0; i < this.stars.length; i++) {
+                const s = this.stars[i];
+
+                // 漂移
+                s.x += s.speedX + flowX * s.drift;
+                s.y += s.speedY + flowY * s.drift;
+
+                // 边界回绕
+                if (s.x < -10) s.x = this.canvas.width + 10;
+                if (s.x > this.canvas.width + 10) s.x = -10;
+                if (s.y < -10) s.y = this.canvas.height + 10;
+                if (s.y > this.canvas.height + 10) s.y = -10;
+
+                // 闪烁
+                s.twinkle += s.twinkleSpeed;
+                const alpha = s.opacity + Math.sin(s.twinkle) * 0.15;
+
+                // 绘制星点
+                this.ctx.beginPath();
+                this.ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                this.ctx.fillStyle = `rgba(${s.r},${s.g},${s.b},${Math.max(0, alpha)})`;
+                this.ctx.fill();
+
+                // 光晕
+                if (s.size > 1.5) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(s.x, s.y, s.size * 3, 0, Math.PI * 2);
+                    this.ctx.fillStyle = `rgba(${s.r},${s.g},${s.b},${alpha * 0.08})`;
+                    this.ctx.fill();
+                }
+
+                // 连线 (距离 < 120px 的星点之间)
+                for (let j = i + 1; j < this.stars.length; j++) {
+                    const s2 = this.stars[j];
+                    const dx = s.x - s2.x;
+                    const dy = s.y - s2.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 120) {
+                        const lineAlpha = (1 - dist / 120) * 0.06;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(s.x, s.y);
+                        this.ctx.lineTo(s2.x, s2.y);
+                        this.ctx.strokeStyle = `rgba(200,80,130,${lineAlpha})`;
+                        this.ctx.lineWidth = 0.5;
+                        this.ctx.stroke();
+                    }
+                }
+            }
+
+            // 鼠标轨迹粒子
+            this.trailParticles = this.trailParticles.filter(p => {
+                p.x += p.speedX; p.y += p.speedY;
+                p.speedY += 0.015;
+                p.life -= p.decay;
+                if (p.life <= 0) return false;
+
+                const alpha = p.life * 0.7;
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+                this.ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha})`;
+                this.ctx.fill();
+
+                // 光晕
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, p.size * p.life * 2.5, 0, Math.PI * 2);
+                this.ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha * 0.12})`;
+                this.ctx.fill();
+
+                return true;
+            });
+
+            // 鼠标光晕
+            if (this.mouseActive) {
+                const g = this.ctx.createRadialGradient(this.mouseX, this.mouseY, 0, this.mouseX, this.mouseY, 70);
+                g.addColorStop(0, 'rgba(232,93,138,0.12)');
+                g.addColorStop(0.5, 'rgba(176,96,176,0.06)');
+                g.addColorStop(1, 'rgba(0,0,0,0)');
+                this.ctx.fillStyle = g;
+                this.ctx.fillRect(this.mouseX - 70, this.mouseY - 70, 140, 140);
+            }
+
+            requestAnimationFrame(() => this.animate());
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('particle-canvas');
+        if (canvas) new GalaxyParticles(canvas);
+    });
+    </script>
+</head>
+<body>
+
+<!-- 粒子画布 (星河) -->
+<canvas id="particle-canvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
+
+<!-- 粉色银河背景 -->
+<div class="pink-galaxy-bg"></div>
+
+<!-- 标题栏 -->
+<div class="titlebar" id="titlebar">
+    <span class="titlebar-title">
+        <span class="titlebar-logo">C</span>
+        ClipVault
+    </span>
+    <div style="flex:1"></div>
+    <div class="traffic-lights" id="traffic-lights">
+        <button class="tl-btn tl-minimize" id="btn-minimize" title="最小化">
+            <svg width="8" height="2" viewBox="0 0 8 2"><path d="M0 1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button class="tl-btn tl-maximize" id="btn-maximize" title="最大化">
+            <svg width="8" height="8" viewBox="0 0 8 8"><rect x="0.5" y="0.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+        </button>
+        <button class="tl-btn tl-close" id="btn-close" title="关闭">
+            <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 1l6 6M7 1l-6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </button>
+    </div>
+</div>
+
+<!-- 主布局 -->
+<div class="app-layout">
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <span style="font-size:18px;">✦</span>
+            </div>
+            <span class="sidebar-title">ClipVault</span>
+        </div>
+
+        <nav class="sidebar-nav" id="sidebar-nav">
+            <div class="nav-item active" data-filter="all" onclick="setFilter('all')">
+                <i data-lucide="layout-grid" class="nav-icon"></i>
+                <span class="nav-text">全部记录</span>
+                <span class="nav-badge" id="badge-all">0</span>
+            </div>
+            <div class="nav-item" data-filter="pinned" onclick="setFilter('pinned')">
+                <i data-lucide="pin" class="nav-icon"></i>
+                <span class="nav-text">置顶</span>
+                <span class="nav-badge" id="badge-pinned">0</span>
+            </div>
+            <div class="nav-item" data-filter="type:text" onclick="setFilter('type:text')">
+                <i data-lucide="type" class="nav-icon"></i>
+                <span class="nav-text">文字</span>
+                <span class="nav-badge" id="badge-text">0</span>
+            </div>
+            <div class="nav-item" data-filter="type:image" onclick="setFilter('type:image')">
+                <i data-lucide="image" class="nav-icon"></i>
+                <span class="nav-text">图片</span>
+                <span class="nav-badge" id="badge-image">0</span>
+            </div>
+        </nav>
+
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-label">标签</div>
+        <div class="sidebar-tags" id="tags-list"></div>
+
+        <div class="sidebar-bottom">
+            <div class="nav-item" onclick="showSettings()" style="margin:0;">
+                <i data-lucide="settings" class="nav-icon"></i>
+                <span class="nav-text">设置</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main-content">
+
+        <!-- 顶栏 -->
+        <div class="topbar">
+            <div class="search-box">
+                <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+                <input type="text" id="search-input" placeholder="搜索剪切板内容..." autocomplete="off">
+            </div>
+            <button class="btn-add" onclick="showAddModal()">
+                <i data-lucide="plus" style="width:16px;height:16px;"></i>
+                <span>新建</span>
+            </button>
+            <div class="topbar-actions">
+                <button class="icon-btn" onclick="exportData()" title="导出">
+                    <i data-lucide="download" style="width:15px;height:15px;"></i>
+                </button>
+                <button class="icon-btn" id="import-btn" title="导入">
+                    <i data-lucide="upload" style="width:15px;height:15px;"></i>
+                </button>
+                <button class="icon-btn danger" onclick="clearAll()" title="清空全部">
+                    <i data-lucide="trash-2" style="width:15px;height:15px;"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 剪切板网格 -->
+        <div class="clips-area" id="clips-area">
+            <div id="clips-grid"></div>
+        </div>
+
+        <!-- 底栏 -->
+        <div class="statusbar">
+            <span class="status-dot"></span>
+            <span id="status-monitoring">监控中</span>
+            <span class="status-separator"></span>
+            <span id="status-count">共 0 条记录</span>
+            <span class="status-separator"></span>
+            <span id="status-last">等待捕获...</span>
+            <span style="margin-left:auto;display:flex;gap:12px;align-items:center;">
+                <span><kbd class="kbd">/</kbd> 搜索</span>
+                <span><kbd class="kbd">N</kbd> 新建</span>
+                <span><kbd class="kbd">Esc</kbd> 关闭</span>
+            </span>
+        </div>
+    </main>
+</div>
+
+<!-- Toast 容器 -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ===== 全局状态 =====
+let clips = [];
+let allTags = [];
+let activeFilter = 'all';
+let activeTag = null;
+let searchQuery = '';
+let imagePreviewSrc = null;
+
+// ===== 工具函数 =====
+function formatTime(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr.replace(' ', 'T'));
+    const now = new Date();
+    const diff = now - date;
+    const s = Math.floor(diff / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    if (s < 60) return '刚刚';
+    if (m < 60) return m + '分钟前';
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayDiff = Math.floor((startOfToday - startOfDate) / 86400000);
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    if (dayDiff === 0) return h + '小时前';
+    if (dayDiff === 1) return '昨天 ' + hh + ':' + mm;
+    if (date.getFullYear() === now.getFullYear()) return (date.getMonth()+1) + '月' + date.getDate() + '日 ' + hh + ':' + mm;
+    return date.getFullYear() + '年' + (date.getMonth()+1) + '月' + date.getDate() + '日';
+}
+
+function truncateText(text, max) {
+    max = max || 300;
+    if (!text) return '';
+    return text.length > max ? text.slice(0, max) + '...' : text;
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function toFileUrl(filePath) {
+    if (!filePath) return '';
+    return 'file:///' + filePath.replace(/\\/g, '/');
+}
+
+// ===== API =====
+const api = window.clipvault || {
+    getAll: async (p) => { try { const r = await fetch('/api/clips'); return r.json(); } catch { return []; } },
+    add: async (d) => { try { const r = await fetch('/api/clips', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}); return r.json(); } catch { return {error:'fail'}; } },
+    update: async (d) => { try { const r = await fetch('/api/clips/'+d.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}); return r.json(); } catch { return {error:'fail'}; } },
+    delete: async (id) => { try { await fetch('/api/clips/'+id,{method:'DELETE'}); } catch {} },
+    copy: async (id) => { try { await fetch('/api/clips/'+id+'/copy',{method:'POST'}); } catch {} },
+    togglePin: async (id) => { try { const r = await fetch('/api/clips/'+id+'/pin',{method:'POST'}); return r.json(); } catch {} },
+    addTag: async (id,tag) => { try { const r = await fetch('/api/clips/'+id+'/tags',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag})}); return r.json(); } catch {} },
+    removeTag: async (id,tag) => { try { const r = await fetch('/api/clips/'+id+'/tags/'+tag,{method:'DELETE'}); return r.json(); } catch {} },
+    clearAll: async () => { try { await fetch('/api/clips',{method:'DELETE'}); } catch {} },
+    exportData: async () => { try { const r = await fetch('/api/export'); return r.json(); } catch { return {}; } },
+    getTags: async () => { try { const r = await fetch('/api/tags'); return r.json(); } catch { return []; } },
+    onNewClip: (cb) => {},
+};
+
+// ===== Toast =====
+function showToast(message, type) {
+    type = type || 'success';
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.innerHTML = '<div class="toast-indicator"></div><span>' + escapeHtml(message) + '</span>';
+    container.appendChild(toast);
+    setTimeout(function() { toast.classList.add('exit'); }, 2200);
+    setTimeout(function() { toast.remove(); }, 2500);
+}
+
+// ===== 数据 =====
+async function loadClips() {
+    clips = await api.getAll({ search: searchQuery || undefined });
+    allTags = await api.getTags();
+    renderClips();
+    renderTags();
+    updateBadges();
+    updateStatus();
+}
+
+function getFilteredClips() {
+    var result = clips.slice();
+    if (activeTag) result = result.filter(function(c) { return c.tags && c.tags.indexOf(activeTag) >= 0; });
+    result.sort(function(a, b) {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+    return result;
+}
+
+function setFilter(filter) {
+    activeFilter = filter;
+    activeTag = null;
+    document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.toggle('active', el.dataset.filter === filter); });
+    document.querySelectorAll('.tag-item').forEach(function(el) { el.classList.remove('active'); });
+    renderClips();
+}
+
+function setTagFilter(tag) {
+    activeTag = activeTag === tag ? null : tag;
+    activeFilter = 'all';
+    document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.toggle('active', el.dataset.filter === 'all' && !activeTag); });
+    document.querySelectorAll('.tag-item').forEach(function(el) { el.classList.toggle('active', el.textContent.trim().replace('# ','') === activeTag); });
+    renderClips();
+}
+
+// ===== 渲染单条卡片 =====
+function renderCard(clip, i) {
+    var isImage = clip.type === 'image';
+    var isText = clip.type === 'text';
+    var text = clip.text || '';
+    var truncated = text.length > 300;
+    var displayText = truncateText(text);
+
+    return '<div class="clip-card ' + (clip.pinned ? 'pinned' : '') + ' type-' + clip.type + '" style="animation-delay:' + Math.min(i * 40, 400) + 'ms" data-id="' + clip.id + '">' +
+        '<div class="clip-header">' +
+            '<div class="clip-meta">' +
+                '<span class="clip-type-badge ' + clip.type + '">' + (isImage ? '🖼 图片' : '✦ 文字') + '</span>' +
+                '<span class="clip-time">' + formatTime(clip.created_at) + '</span>' +
+                (clip.pinned ? '<span class="clip-pin-icon">⭐</span>' : '') +
+            '</div>' +
+            '<div class="clip-actions">' +
+                '<button class="icon-btn" onclick="copyClip(\'' + clip.id + '\')" title="复制"><i data-lucide="copy" style="width:13px;height:13px;"></i></button>' +
+                '<button class="icon-btn ' + (clip.pinned ? 'pin-active' : '') + '" onclick="togglePin(\'' + clip.id + '\')" title="' + (clip.pinned ? '取消置顶' : '置顶') + '"><i data-lucide="pin" style="width:13px;height:13px;"></i></button>' +
+                '<button class="icon-btn danger" onclick="deleteClip(\'' + clip.id + '\')" title="删除"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></button>' +
+            '</div>' +
+        '</div>' +
+        (isImage ? '<img class="clip-image-thumb" src="' + toFileUrl(clip.image_path) + '" alt="图片" onclick="previewImage(\'' + toFileUrl(clip.image_path) + '\')" onerror="this.style.display=\'none\'">' : '') +
+        (isText ? '<div class="clip-text ' + (truncated ? 'truncated' : '') + '" onclick="copyClip(\'' + clip.id + '\')" title="点击复制">' + escapeHtml(displayText) + '</div>' : '') +
+        '<div class="clip-footer">' +
+            '<div class="clip-tags">' +
+                (clip.tags || []).map(function(t) { return '<span class="clip-tag" onclick="removeTag(\'' + clip.id + '\',\'' + t + '\')" title="点击移除"># ' + escapeHtml(t) + '</span>'; }).join('') +
+                '<button class="clip-tag add-tag-btn" onclick="promptAddTag(\'' + clip.id + '\')">+ 标签</button>' +
+            '</div>' +
+            (clip.copy_count > 0 ? '<span class="clip-copy-count"><i data-lucide="copy" style="width:10px;height:10px;"></i> ' + clip.copy_count + '</span>' : '') +
+        '</div>' +
+    '</div>';
+}
+
+// ===== 渲染卡片（文字/图片分区） =====
+function renderClips() {
+    var grid = document.getElementById('clips-grid');
+    var filtered = getFilteredClips();
+    if (activeFilter === 'pinned') filtered = filtered.filter(function(c) { return c.pinned; });
+    else if (activeFilter === 'type:text') filtered = filtered.filter(function(c) { return c.type === 'text'; });
+    else if (activeFilter === 'type:image') filtered = filtered.filter(function(c) { return c.type === 'image'; });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">' +
+            '<div style="font-size:48px;margin-bottom:16px;opacity:0.5;">✧</div>' +
+            '<p class="empty-title">' + (searchQuery ? '未找到匹配项' : '暂无记录') + '</p>' +
+            '<p class="empty-desc">' + (searchQuery ? '试试其他关键词' : '复制任意内容将自动捕获，或点击上方 新建 按钮') + '</p>' +
+            '</div>';
+        return;
+    }
+
+    // 「全部记录」视图：文字和图片分两个区块
+    if (activeFilter === 'all' && !activeTag) {
+        var textClips = filtered.filter(function(c) { return c.type === 'text'; });
+        var imageClips = filtered.filter(function(c) { return c.type === 'image'; });
+        var html = '';
+
+        if (textClips.length > 0) {
+            html += '<div class="section-header">' +
+                '<span class="section-header-icon text-icon">✦</span>' +
+                '<span class="section-header-title">文字记录</span>' +
+                '<span class="section-header-count">' + textClips.length + '</span>' +
+            '</div>';
+            html += '<div class="clips-grid">';
+            html += textClips.map(function(clip, i) { return renderCard(clip, i); }).join('');
+            html += '</div>';
+        }
+
+        if (textClips.length > 0 && imageClips.length > 0) {
+            html += '<div class="section-divider"></div>';
+        }
+
+        if (imageClips.length > 0) {
+            html += '<div class="section-header">' +
+                '<span class="section-header-icon image-icon">🖼</span>' +
+                '<span class="section-header-title">图片记录</span>' +
+                '<span class="section-header-count">' + imageClips.length + '</span>' +
+            '</div>';
+            html += '<div class="clips-grid">';
+            html += imageClips.map(function(clip, i) { return renderCard(clip, i); }).join('');
+            html += '</div>';
+        }
+
+        grid.innerHTML = html;
+    } else {
+        // 其他筛选视图：不分区
+        grid.innerHTML = '<div class="clips-grid">' +
+            filtered.map(function(clip, i) { return renderCard(clip, i); }).join('') +
+            '</div>';
+    }
+
+    lucide.createIcons();
+}
+
+function renderTags() {
+    var container = document.getElementById('tags-list');
+    if (allTags.length === 0) {
+        container.innerHTML = '<div class="empty-hint">点击卡片底部「+ 标签」添加</div>';
+        return;
+    }
+    container.innerHTML = allTags.map(function(tag) {
+        return '<div class="tag-item ' + (activeTag === tag ? 'active' : '') + '" onclick="setTagFilter(\'' + escapeHtml(tag) + '\')">' +
+            '<span class="tag-dot"></span><span class="tag-text"># ' + escapeHtml(tag) + '</span></div>';
+    }).join('');
+}
+
+function updateBadges() {
+    document.getElementById('badge-all').textContent = clips.length;
+    document.getElementById('badge-pinned').textContent = clips.filter(function(c) { return c.pinned; }).length;
+    document.getElementById('badge-text').textContent = clips.filter(function(c) { return c.type === 'text'; }).length;
+    document.getElementById('badge-image').textContent = clips.filter(function(c) { return c.type === 'image'; }).length;
+}
+
+function updateStatus() {
+    document.getElementById('status-count').textContent = '共 ' + clips.length + ' 条记录';
+    if (clips.length > 0) document.getElementById('status-last').textContent = '最新: ' + formatTime(clips[0].created_at);
+}
+
+// ===== 操作 =====
+async function copyClip(id) {
+    await api.copy(id);
+    var card = document.querySelector('[data-id="' + id + '"]');
+    if (card) { card.classList.add('copy-pulse'); setTimeout(function() { card.classList.remove('copy-pulse'); }, 600); }
+    showToast('已复制到剪切板 ♡');
+    loadClips();
+}
+
+async function togglePin(id) { await api.togglePin(id); loadClips(); }
+async function deleteClip(id) { await api.delete(id); showToast('已删除', 'error'); loadClips(); }
+async function removeTag(clipId, tag) { await api.removeTag(clipId, tag); loadClips(); }
+
+function promptAddTag(clipId) {
+    var tag = prompt('输入标签名:');
+    if (tag && tag.trim()) api.addTag(clipId, tag.trim().toLowerCase()).then(function() { loadClips(); });
+}
+
+// ===== 新建弹窗 =====
+function showAddModal() {
+    var existing = document.getElementById('add-modal');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'add-modal';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = '<div class="modal">' +
+        '<h3>✦ 新建记录</h3>' +
+        '<textarea id="add-textarea" placeholder="粘贴或输入内容..." autofocus></textarea>' +
+        '<div class="modal-actions">' +
+            '<button class="btn btn-ghost" onclick="document.getElementById(\'add-modal\').remove()">取消</button>' +
+            '<button class="btn btn-primary" onclick="submitAdd()">保存 ♡</button>' +
+        '</div></div>';
+    document.body.appendChild(overlay);
+    setTimeout(function() { var ta = document.getElementById('add-textarea'); if (ta) ta.focus(); }, 50);
+    document.getElementById('add-textarea').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitAdd();
+        if (e.key === 'Escape') document.getElementById('add-modal').remove();
+    });
+}
+
+async function submitAdd() {
+    var ta = document.getElementById('add-textarea');
+    var text = ta ? ta.value.trim() : '';
+    if (!text) return;
+    await api.add({ type: 'text', text: text });
+    var modal = document.getElementById('add-modal');
+    if (modal) modal.remove();
+    showToast('已添加 ✧');
+    loadClips();
+}
+
+// ===== 图片预览 =====
+function previewImage(src) {
+    imagePreviewSrc = src;
+    var overlay = document.createElement('div');
+    overlay.className = 'image-preview-overlay';
+    overlay.onclick = function() { overlay.remove(); };
+    var img = document.createElement('img');
+    img.src = src;
+    img.alt = '预览';
+    img.onerror = function() { overlay.innerHTML = '<p style="color:#f472b6;font-size:14px;">图片加载失败</p>'; };
+    overlay.appendChild(img);
+    document.body.appendChild(overlay);
+}
+
+// ===== 导出 =====
+async function exportData() {
+    var data = await api.exportData();
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'clipvault_' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('已导出 ✧');
+}
+
+async function clearAll() {
+    if (!confirm('确定清空所有记录？')) return;
+    await api.clearAll();
+    showToast('已清空', 'error');
+    loadClips();
+}
+
+// ===== 设置面板 =====
+async function showSettings() {
+    var existing = document.getElementById('settings-modal');
+    if (existing) existing.remove();
+
+    var s = await api.getSettings();
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'settings-modal';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    var closeActions = [
+        { value: 'ask', label: '每次询问', desc: '关闭时弹窗选择' },
+        { value: 'minimize', label: '最小化到后台', desc: '始终最小化到托盘' },
+        { value: 'exit', label: '完全退出', desc: '始终彻底退出' },
+    ];
+
+    overlay.innerHTML = '<div class="modal" style="width:460px;">' +
+        '<h3 style="display:flex;align-items:center;gap:8px;">✦ 设置</h3>' +
+
+        // 自动删除
+        '<div class="settings-group">' +
+            '<div class="settings-label">自动删除</div>' +
+            '<div class="settings-row">' +
+                '<span>记录保留时间</span>' +
+                '<select id="s-auto-delete" class="settings-select">' +
+                    '<option value="0"' + (s.autoDeleteHours === 0 ? ' selected' : '') + '>不自动删除</option>' +
+                    '<option value="1"' + (s.autoDeleteHours === 1 ? ' selected' : '') + '>1 小时</option>' +
+                    '<option value="6"' + (s.autoDeleteHours === 6 ? ' selected' : '') + '>6 小时</option>' +
+                    '<option value="24"' + (s.autoDeleteHours === 24 ? ' selected' : '') + '>24 小时</option>' +
+                    '<option value="72"' + (s.autoDeleteHours === 72 ? ' selected' : '') + '>3 天</option>' +
+                    '<option value="168"' + (s.autoDeleteHours === 168 ? ' selected' : '') + '>7 天</option>' +
+                '</select>' +
+            '</div>' +
+            '<div class="settings-row">' +
+                '<span>复制后重置计时</span>' +
+                '<label class="toggle"><input type="checkbox" id="s-reset-on-copy"' + (s.resetOnCopy ? ' checked' : '') + '><span class="toggle-slider"></span></label>' +
+            '</div>' +
+            '<div class="settings-hint">置顶的记录不会被自动删除</div>' +
+        '</div>' +
+
+        // 关闭行为
+        '<div class="settings-group">' +
+            '<div class="settings-label">关闭行为</div>' +
+            closeActions.map(function(a) {
+                return '<div class="settings-radio-row">' +
+                    '<label class="radio-label">' +
+                        '<input type="radio" name="close-action" value="' + a.value + '"' + (s.closeAction === a.value ? ' checked' : '') + '>' +
+                        '<span class="radio-dot"></span>' +
+                        '<div><div class="radio-title">' + a.label + '</div><div class="radio-desc">' + a.desc + '</div></div>' +
+                    '</label>' +
+                '</div>';
+            }).join('') +
+        '</div>' +
+
+        // 开机自启
+        '<div class="settings-group">' +
+            '<div class="settings-row">' +
+                '<span>开机自启动</span>' +
+                '<label class="toggle"><input type="checkbox" id="s-auto-start"' + (s.autoStart ? ' checked' : '') + '><span class="toggle-slider"></span></label>' +
+            '</div>' +
+        '</div>' +
+
+        '<div class="modal-actions" style="margin-top:20px;">' +
+            '<button class="btn btn-primary" onclick="saveSettings()">保存</button>' +
+        '</div>' +
+    '</div>';
+
+    document.body.appendChild(overlay);
+}
+
+async function saveSettings() {
+    var autoDelete = parseInt(document.getElementById('s-auto-delete').value);
+    var resetOnCopy = document.getElementById('s-reset-on-copy').checked;
+    var autoStart = document.getElementById('s-auto-start').checked;
+    var closeRadio = document.querySelector('input[name="close-action"]:checked');
+    var closeAction = closeRadio ? closeRadio.value : 'ask';
+
+    await api.setSettings({
+        autoDeleteHours: autoDelete,
+        resetOnCopy: resetOnCopy,
+        autoStart: autoStart,
+        closeAction: closeAction,
+    });
+
+    var modal = document.getElementById('settings-modal');
+    if (modal) modal.remove();
+    showToast('设置已保存 ✧');
+}
+
+// ===== 搜索 =====
+var searchTimer = null;
+document.getElementById('search-input').addEventListener('input', function(e) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() { searchQuery = e.target.value; loadClips(); }, 200);
+});
+
+// ===== 快捷键 =====
+document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && !e.metaKey && !e.ctrlKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault(); document.getElementById('search-input').focus();
+    }
+    if (e.key === 'n' && !e.metaKey && !e.ctrlKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault(); showAddModal();
+    }
+    if (e.key === 'Escape') {
+        var modal = document.getElementById('add-modal'); if (modal) modal.remove();
+        var preview = document.querySelector('.image-preview-overlay'); if (preview) preview.remove();
+        document.getElementById('search-input').blur();
+        searchQuery = ''; document.getElementById('search-input').value = ''; loadClips();
+    }
+});
+
+// ===== 新剪切板事件 =====
+api.onNewClip(function(clip) {
+    clips.unshift(clip);
+    renderClips(); updateBadges(); updateStatus();
+    setTimeout(function() { var card = document.querySelector('.clip-card'); if (card) card.classList.add('new-pulse'); }, 50);
+    showToast('新内容已捕获 ✧', 'info');
+});
+
+// 自动删除后刷新
+if (api.onRefresh) api.onRefresh(function() { loadClips(); });
+
+// ===== 导入 =====
+document.getElementById('import-btn').addEventListener('click', function() {
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json';
+    input.onchange = async function(e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        var text = await file.text();
+        try {
+            var data = JSON.parse(text);
+            var arr = data.clips || data;
+            if (Array.isArray(arr)) { await api.importData(arr); showToast('已导入 ' + arr.length + ' 条记录 ✧'); loadClips(); }
+        } catch(err) { showToast('导入失败', 'error'); }
+    };
+    input.click();
+});
+
+// ===== 初始化 =====
+document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+    loadClips();
+
+    // 窗口控制
+    var cv = window.clipvault;
+    console.log('[RENDERER] clipvault API:', cv ? 'OK' : 'MISSING');
+    if (cv) {
+        var btnClose = document.getElementById('btn-close');
+        var btnMin = document.getElementById('btn-minimize');
+        var btnMax = document.getElementById('btn-maximize');
+        console.log('[RENDERER] btn-close:', btnClose ? 'found' : 'NOT FOUND');
+        if (btnClose) btnClose.addEventListener('click', function() { console.log('click close'); cv.close(); });
+        if (btnMin) btnMin.addEventListener('click', function() { console.log('click min'); cv.minimize(); });
+        if (btnMax) btnMax.addEventListener('click', function() { console.log('click max'); cv.maximize(); });
+    }
+});
+</script>
+
+</body>
+</html>
